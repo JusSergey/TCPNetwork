@@ -36,8 +36,10 @@ public:
     Buffer(const char *_data, size_t len) : __Buffer(len) {
         memcpy(this->data(), _data, len);
     }
-    Buffer(const std::string &str) : __Buffer(str.size()+1) {
-        memcpy(this->data(), str.data(), str.size()+1);
+    Buffer(const std::string &str) : __Buffer(str.size()) {
+//        std::cout << "string";
+        memcpy(this->data(), str.data(), str.size());
+        this->operator <<('\0');
     }
 
     Buffer &operator = (const std::string &str) {
@@ -66,11 +68,15 @@ public:
     std::string toString() {
 
         std::string str;
-        str.resize(this->size());
-        memcpy(&str[0], this->data(), this->size());
+        const size_t len = size();
+        if (len < 1)
+            return str;
 
-        if (str.data()[str.length()] != '\0')
-            str += '\0';
+        str.resize(len-1);
+
+        const char *dt = data();
+        for (int i = 0; i < len; i++)
+            str [i] = dt[i];
 
         return str;
     }

@@ -29,7 +29,7 @@ int main(int argc, char *argv[])
     QCoreApplication a(argc, argv);
 
     constexpr const char *IP = "127.0.0.1";
-    constexpr u_short PORT = 2131;
+    constexpr u_short PORT = 2168;
 
     {
         TCPServer server(IP, PORT);
@@ -39,7 +39,7 @@ int main(int argc, char *argv[])
             sock.sendMessage("Connected success...\n");
         });
         server.setCallbackRead([](Buffer buffer, SocketFD){
-            std::cout << "Server: " << buffer.toString() << '\n';
+            std::cout << "Server: " << buffer.data() << '\n';
         });
 
         client.sendMessage("Hello, world...");
