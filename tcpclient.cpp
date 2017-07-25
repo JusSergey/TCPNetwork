@@ -26,5 +26,6 @@ CallbackLoop TCPClient::getCallbackLoopClient()
 
 void TCPClient::disconnect()
 {
-
+    sendMessage("good bye...", TypeMsg::Disconnect);
+    stop();
 }

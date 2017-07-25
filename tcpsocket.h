@@ -15,8 +15,6 @@
 #include <vector>
 #include <type_traits>
 
-constexpr auto _64KB = 65536;
-constexpr auto DELAY_TIME = 3; //ms
 
 namespace Net {
 
@@ -26,25 +24,38 @@ class Buffer;
 using __Buffer           = std::vector<char>;
 using CallbackRecv       = std::function<void(Buffer, SocketFD)>;
 using CallbackLoop       = std::function<void()>;
+using uint64 = uint64_t;
+using uint32 = uint32_t;
+using uint16 = uint16_t;
+using int64 = int64_t;
+using int32 = int32_t;
+using int16 = int16_t;
 
 enum class TypeMsg : char {
-    UserMsg, Conn, Disconn
+    UserMsg, TestConnection, Disconnect
 };
+
+enum class SocketStatus : int {
+    Failed = -1
+};
+
+constexpr auto MAX_SIZE_PACKET = 65536 - sizeof(uint16) - sizeof(TypeMsg);
+constexpr auto DELAY_TIME = 1; //ms
 
 class Buffer : public __Buffer {
 public:
     Buffer(const char *_data, size_t len) : __Buffer(len) {
         memcpy(this->data(), _data, len);
     }
-    Buffer(const std::string &str) : __Buffer(str.size()) {
-//        std::cout << "string";
-        memcpy(this->data(), str.data(), str.size());
-        this->operator <<('\0');
+    Buffer(const std::string &str) : __Buffer(str.size()+1) {
+        auto strsz = str.size();
+        memcpy(this->data(), str.data(), strsz);
+        data()[strsz] = '\0';
     }
 
     Buffer &operator = (const std::string &str) {
-        this->resize(str.size()+1);
-        memcpy(this->data(), str.data(), str.size()+1);
+        this->resize(str.size());
+        memcpy(this->data(), str.data(), str.size());
         return *this;
     }
 
@@ -63,6 +74,10 @@ public:
         reserve(size() + sz + 4);
         for(int i = 0; i < sz; ++i)
             push_back(dt[i]);
+        return *this;
+    }
+    Buffer &operator << (TypeMsg type) {
+        push_back(static_cast<std::underlying_type<TypeMsg>::type>(type));
         return *this;
     }
 
@@ -91,7 +106,7 @@ public:
     Device(const Device &dev) = default;
     Device &operator = (const Device &) = default;
 
-    size_t read(char *destination, uint64_t len) {
+    size_t read(char *destination, uint64 len) {
         auto sub = _sz-_pos;
         size_t readlen = sub < len ? sub : len;
         memcpy(destination, _device->data() + _pos, readlen);
@@ -121,9 +136,26 @@ struct SocketFD {
     operator int&() {
         return _fd;
     }
+    SocketFD &operator = (const SocketStatus &status) {
+        _fd = static_cast<std::underlying_type<SocketStatus>::type>(status);
+    }
+
+    inline int toInt() const { return _fd; }
+
     SocketFD(const SocketFD &) = default;
     SocketFD() = default;
     SocketFD(int fd) : _fd(fd) {}
+
+    inline bool operator == (const SocketFD &_cmp) const { return _fd == _cmp._fd; }
+    inline bool operator != (const SocketFD &_cmp) const { return _fd != _cmp._fd; }
+
+    inline bool operator == (const SocketStatus &_cmp) const
+    { return _fd == static_cast<std::underlying_type<SocketStatus>::type>(_cmp); }
+    inline bool operator != (const SocketStatus &_cmp) const
+    { return _fd != static_cast<std::underlying_type<SocketStatus>::type>(_cmp); }
+
+    inline bool isValid() const { return *this != SocketStatus::Failed; }
+
     void sendMessage(const std::string &msg) const;
     void sendData(const Buffer &buffer) const;
 protected:
@@ -135,7 +167,7 @@ class TCPSocket : public SocketFD
 {
 public:
     std::future<void> _fut;
-    TCPSocket(const std::string &ip, u_short port);
+    TCPSocket(const std::string &ip, uint16 port);
     virtual ~TCPSocket();
 
 protected:
@@ -155,6 +187,7 @@ protected: /* data info to init */
 protected: /* data read/write buffers */
     CallbackRecv callbackRead = [] (Buffer, SocketFD) {};
     Buffer _buffer;
+    TypeMsg _typeMsg;
 
 protected: /* data to init socket */
     std::atomic_bool _running;

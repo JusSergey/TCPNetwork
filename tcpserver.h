@@ -9,6 +9,7 @@
 namespace Net {
 
 using CallbackConnected = std::function<void(SocketFD)>;
+using CallbackDisconnect= std::function<void(SocketFD)>;
 
 class TCPServer : public TCPSocket
 {
@@ -20,18 +21,24 @@ public:
     virtual ~TCPServer();
 
 private:
+    void procSpecifiedMsg(SocketFD &fd);
     void acceptClient();
     void recvMsg();
     CallbackLoop getCallbackLoopServer();
 
 public:
     const ListClients &getClients() { return clientsFD; }
+
     CallbackConnected getCallbackConnected() const;
     void setCallbackConnected(const CallbackConnected &value);
+
+    CallbackDisconnect getCallbackDisconnect() const;
+    void setCallbackDisconnect(const CallbackDisconnect &value);
 
 private:
     ListClients clientsFD;
     CallbackConnected callbackConnected = [] (SocketFD) {};
+    CallbackDisconnect callbackDisconnect = [] (SocketFD) {};
 
 };
 

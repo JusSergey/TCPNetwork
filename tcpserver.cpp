@@ -19,26 +19,42 @@ TCPServer::~TCPServer()
 
 }
 
+void TCPServer::procSpecifiedMsg(SocketFD &fd)
+{
+    switch (_typeMsg) {
+    case TypeMsg::Disconnect:
+        callbackDisconnect(fd);
+        fd = SocketStatus::Failed;
+        std::cout << "last message: " << _buffer.toString();
+        break;
+    case TypeMsg::TestConnection: break;
+    }
+}
+
 void TCPServer::acceptClient()
 {
     int fd = accept(_fd, NULL, NULL);
     if (fd >= 0) {
         clientsFD.push_back(fd);
         callbackConnected(fd);
-        std::cout << "new client[" << fd << "]\n";
     }
     std::cout.flush();
 }
 
 void TCPServer::recvMsg()
 {
-    for (int fd : clientsFD) {
-
-        if (readMessage(fd)){
-            std::cout.flush();
-            callbackRead(_buffer, Net::SocketFD(fd));
+    for (SocketFD &fd : clientsFD) {
+        if (readMessage(fd)) {
+            switch (_typeMsg) {
+                case TypeMsg::UserMsg:
+                    callbackRead(_buffer, fd); break;
+                default:
+                    procSpecifiedMsg(fd); break;
+            }
         }
     }
+
+    clientsFD.remove_if([] (const SocketFD &fd) -> bool { return !fd.isValid(); });
 }
 
 CallbackLoop TCPServer::getCallbackLoopServer()
@@ -57,5 +73,15 @@ CallbackConnected TCPServer::getCallbackConnected() const
 void TCPServer::setCallbackConnected(const CallbackConnected &value)
 {
     callbackConnected = value;
+}
+
+CallbackDisconnect TCPServer::getCallbackDisconnect() const
+{
+    return callbackDisconnect;
+}
+
+void TCPServer::setCallbackDisconnect(const CallbackDisconnect &value)
+{
+    callbackDisconnect = value;
 }
 

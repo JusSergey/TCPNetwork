@@ -5,11 +5,11 @@
 #include <thread>
 using namespace Net;
 
-TCPSocket::TCPSocket(const std::string &ip, u_short port) :
+TCPSocket::TCPSocket(const std::string &ip, uint16 port) :
     SocketFD(-1),
     _ip(ip),
     _port(port),
-    _buffer(_64KB),
+    _buffer(MAX_SIZE_PACKET),
     _running(true)
 {
     memset(&_sock, '\0', sizeof(_sock));
@@ -55,23 +55,25 @@ void TCPSocket::unlockfd()
 
 bool TCPSocket::readMessage(int fd)
 {
-    u_short datalen = 0;
-    ssize_t readlen = recv(fd, (char*)&datalen, sizeof(u_short), MSG_PEEK | MSG_DONTWAIT);
-    if (readlen < 2 || datalen < 2) {
+    /* READ HEAD TCP PACKET */
+    uint16 AllBytesSize = 0;
+    if (recv(fd, (char*)&AllBytesSize, sizeof(uint16), MSG_PEEK | MSG_DONTWAIT) < sizeof(uint16) || AllBytesSize < sizeof(uint16))
         return false;
-    }
+    recv(fd, (char*)&AllBytesSize, sizeof(uint16), MSG_DONTWAIT); // IGNORE BYTES
 
-    u_short ignore = 0;
-    if (recv(fd, (char*)&ignore, sizeof(u_short), MSG_DONTWAIT) < 2)
+    /* READ TYPE MSG */
+    if (recv(fd, (char*)&_typeMsg, sizeof(TypeMsg), MSG_PEEK | MSG_DONTWAIT) < sizeof(TypeMsg))
         return false;
+    recv(fd, (char*)&_typeMsg, sizeof(TypeMsg), MSG_DONTWAIT); // IGNORE BYTES
 
-    _buffer.resize(datalen-sizeof(u_short));
+    // set size buffer
+    uint16 bufferSize = AllBytesSize - sizeof(uint16) - sizeof(TypeMsg);
+    _buffer.resize(bufferSize);
 
-    readlen = recv(fd, _buffer.data(), datalen - sizeof(u_short), MSG_PEEK | MSG_DONTWAIT);
-    if (readlen != (datalen-sizeof(u_short)))
+    /* READ BODY MSG */
+    if (recv(fd, _buffer.data(), bufferSize, MSG_PEEK | MSG_DONTWAIT) != bufferSize)
         return false;
-
-    recv(fd, _buffer.data(), datalen - sizeof(u_short), MSG_DONTWAIT);
+    recv(fd, _buffer.data(), bufferSize, MSG_DONTWAIT); // IGNORE BYTES
 
     return true;
 }
@@ -107,9 +109,10 @@ void SocketFD::sendData(const Buffer &buffer) const
 
 void SocketFD::sendData(const Buffer &buffer, TypeMsg type) const
 {
-    u_short sz = buffer.size() + sizeof(u_short);
+    uint16 sz = buffer.size() + sizeof(uint16) + sizeof(type);
     Buffer forSend;
     forSend << sz;
+    forSend << type;
     forSend << buffer;
     send(_fd, forSend.data(), forSend.size(), MSG_NOSIGNAL);
 }
