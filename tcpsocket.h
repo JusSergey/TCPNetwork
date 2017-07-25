@@ -60,6 +60,7 @@ public:
     Buffer &operator << (const Buffer &buffer) {
         const size_t sz = buffer.size();
         const char *dt = buffer.data();
+        reserve(size() + sz + 4);
         for(int i = 0; i < sz; ++i)
             push_back(dt[i]);
         return *this;
@@ -75,9 +76,6 @@ public:
         str.resize(len-1);
 
         memcpy(&str[0], data(), len);
-//        const char *dt = data();
-//        for (int i = 0; i < len; i++)
-//            str [i] = dt[i];
 
         return str;
     }
