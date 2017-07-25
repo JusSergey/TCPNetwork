@@ -74,9 +74,10 @@ public:
 
         str.resize(len-1);
 
-        const char *dt = data();
-        for (int i = 0; i < len; i++)
-            str [i] = dt[i];
+        memcpy(&str[0], data(), len);
+//        const char *dt = data();
+//        for (int i = 0; i < len; i++)
+//            str [i] = dt[i];
 
         return str;
     }
