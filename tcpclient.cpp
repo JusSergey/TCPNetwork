@@ -19,13 +19,27 @@ CallbackLoop TCPClient::getCallbackLoopClient()
 {
     return [this] {
         if (readMessage()) {
-            callbackRead(_buffer, _fd);
+            _callbackRead(_buffer, _fd);
         }
     };
 }
 
-void TCPClient::disconnect()
+void TCPClient::disconnectFromHost()
 {
     sendMessage("good bye...", TypeMsg::Disconnect);
     stop();
+}
+
+void TCPClient::specifiedConfirmConnection(Buffer &buff, SocketFD &socket)
+{
+}
+
+void TCPClient::specifiedDisconnect(Buffer &buff, SocketFD &socket)
+{
+    stop();
+}
+
+void TCPClient::specifiedTectConnection(Buffer &buff, SocketFD &socket)
+{
+    socket.sendMessage("", TypeMsg::ConfirmConnection);
 }

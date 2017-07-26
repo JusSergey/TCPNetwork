@@ -19,18 +19,6 @@ TCPServer::~TCPServer()
 
 }
 
-void TCPServer::procSpecifiedMsg(SocketFD &fd)
-{
-    switch (_typeMsg) {
-    case TypeMsg::Disconnect:
-        callbackDisconnect(fd);
-        fd = SocketStatus::Failed;
-        std::cout << "last message: " << _buffer.toString();
-        break;
-    case TypeMsg::TestConnection: break;
-    }
-}
-
 void TCPServer::acceptClient()
 {
     int fd = accept(_fd, NULL, NULL);
@@ -43,16 +31,9 @@ void TCPServer::acceptClient()
 
 void TCPServer::recvMsg()
 {
-    for (SocketFD &fd : clientsFD) {
-        if (readMessage(fd)) {
-            switch (_typeMsg) {
-                case TypeMsg::UserMsg:
-                    callbackRead(_buffer, fd); break;
-                default:
-                    procSpecifiedMsg(fd); break;
-            }
-        }
-    }
+    for (SocketFD &fd : clientsFD)
+        if (readMessage(fd))
+            _callbackRead(_buffer, fd);
 
     clientsFD.remove_if([] (const SocketFD &fd) -> bool { return !fd.isValid(); });
 }
@@ -83,5 +64,28 @@ CallbackDisconnect TCPServer::getCallbackDisconnect() const
 void TCPServer::setCallbackDisconnect(const CallbackDisconnect &value)
 {
     callbackDisconnect = value;
+}
+
+void TCPServer::disconnectClientFromServer(SocketFD fdClient)
+{
+    fdClient.sendMessage("DISCONNECT FROM HOST", TypeMsg::Disconnect);
+
+    for (SocketFD &fd : clientsFD)
+        if (fd == fdClient)
+            fd.setValidFalse();
+}
+
+void TCPServer::specifiedConfirmConnection(Buffer &buff, SocketFD &socket)
+{
+}
+
+void TCPServer::specifiedDisconnect(Buffer &buff, SocketFD &socket)
+{
+    socket.closeSocketFD();
+}
+
+void TCPServer::specifiedTectConnection(Buffer &buff, SocketFD &socket)
+{
+    socket.sendMessage("", TypeMsg::ConfirmConnection);
 }
 

@@ -14,6 +14,7 @@ using CallbackDisconnect= std::function<void(SocketFD)>;
 class TCPServer : public TCPSocket
 {
 public:
+    friend struct SocketFD;
     using ListClients = std::list<SocketFD>;
 
 public:
@@ -21,13 +22,12 @@ public:
     virtual ~TCPServer();
 
 private:
-    void procSpecifiedMsg(SocketFD &fd);
     void acceptClient();
     void recvMsg();
     CallbackLoop getCallbackLoopServer();
 
 public:
-    const ListClients &getClients() { return clientsFD; }
+    inline const ListClients &getClients() { return clientsFD; }
 
     CallbackConnected getCallbackConnected() const;
     void setCallbackConnected(const CallbackConnected &value);
@@ -35,10 +35,17 @@ public:
     CallbackDisconnect getCallbackDisconnect() const;
     void setCallbackDisconnect(const CallbackDisconnect &value);
 
+    void disconnectClientFromServer(SocketFD fdClient);
+
 private:
     ListClients clientsFD;
     CallbackConnected callbackConnected = [] (SocketFD) {};
     CallbackDisconnect callbackDisconnect = [] (SocketFD) {};
+
+protected:
+    virtual void specifiedDisconnect(Buffer &buff, SocketFD &socket) override;
+    virtual void specifiedTectConnection(Buffer &buff, SocketFD &socket) override;
+    virtual void specifiedConfirmConnection(Buffer &buff, SocketFD &socket) override;
 
 };
 

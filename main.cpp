@@ -1,6 +1,7 @@
 #include <QCoreApplication>
 #include "net.h"
 #include <QFile>
+#include <chrono>
 
 using namespace Net;
 
@@ -10,17 +11,17 @@ callbackClientRead() {
         std::cout << "client: " << buffer.toString() << '\n';
         std::cout.flush();
         socket.sendMessage((buffer).toString());
-        std::this_thread::sleep_for(std::chrono::milliseconds(300));
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
     };
 }
 
 std::function<void(Net::Buffer, Net::SocketFD)>
-callbackServerRead() {
-    return [] (Net::Buffer buffer, Net::SocketFD socket) {
+callbackServerRead(TCPServer &server) {
+    return [&server] (Net::Buffer buffer, Net::SocketFD socket) {
         std::cout << "server: " << buffer.data() << '\n';
         std::cout.flush();
         socket.sendData(buffer);
-        std::this_thread::sleep_for(std::chrono::milliseconds(300));
+        std::this_thread::sleep_for(milliseconds(300));
     };
 }
 
@@ -29,22 +30,21 @@ int main(int argc, char *argv[])
     QCoreApplication a(argc, argv);
 
     constexpr const char *IP = "127.0.0.1";
-    constexpr u_short PORT = 2169;
+    constexpr u_short PORT = 2114;
 
     {
         TCPServer server(IP, PORT);
         TCPClient client(IP, PORT);
 
-        server.setCallbackRead(callbackServerRead());
+        server.setCallbackRead(callbackServerRead(server));
         client.setCallbackRead(callbackClientRead());
 
-        client.sendMessage("Msg");
         server.setCallbackDisconnect([](SocketFD fd){ std::cout << "server: disconnect fd: " << fd << '\n'; });
 
-//        std::cin.get();
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        client.sendMessage("Hello...");
 
-        client.disconnect();
+        std::this_thread::sleep_for(seconds(2));
+        client.disconnectFromHost();
 
         std::cin.get();
         return 0;

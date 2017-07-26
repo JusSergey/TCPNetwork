@@ -1,8 +1,8 @@
 #include "tcpsocket.h"
 #include <cstring>
 #include <fcntl.h>
-#include <unistd.h>
 #include <thread>
+#include <unistd.h>
 using namespace Net;
 
 TCPSocket::TCPSocket(const std::string &ip, uint16 port) :
@@ -10,7 +10,8 @@ TCPSocket::TCPSocket(const std::string &ip, uint16 port) :
     _ip(ip),
     _port(port),
     _buffer(MAX_SIZE_PACKET),
-    _running(true)
+    _running(true),
+    _lastConfirmConnection(steady_clock::now())
 {
     memset(&_sock, '\0', sizeof(_sock));
 
@@ -27,9 +28,6 @@ TCPSocket::~TCPSocket()
 {
     if (_running.load())
         stop();
-
-    close(_fd);
-    std::cout.flush();
 }
 
 void TCPSocket::initLoop(CallbackLoop callbackLoop)
@@ -37,7 +35,7 @@ void TCPSocket::initLoop(CallbackLoop callbackLoop)
     _fut = std::async(std::launch::async, [&, callbackLoop] {
         while (_running.load()) {
             callbackLoop();
-            std::this_thread::sleep_for(std::chrono::milliseconds(DELAY_TIME));
+            std::this_thread::sleep_for(milliseconds(DELAY_TIME));
         }
     });
 }
@@ -53,7 +51,17 @@ void TCPSocket::unlockfd()
     }
 }
 
-bool TCPSocket::readMessage(int fd)
+void TCPSocket::procSpecifiedMsg(Buffer &buff, SocketFD &socket)
+{
+    switch (_typeMsg) {
+    case TypeMsg::ConfirmConnection: specifiedConfirmConnection(buff, socket); break;
+    case TypeMsg::Disconnect: specifiedDisconnect(buff, socket); break;
+    case TypeMsg::TestConnection: specifiedTectConnection(buff, socket); break;
+    default: (std::cout << "TCPSocket::procSpecifiedMsg():temrinate").flush(); std::terminate();
+    }
+}
+
+bool TCPSocket::readMessage(SocketFD &fd)
 {
     /* READ HEAD TCP PACKET */
     uint16 AllBytesSize = 0;
@@ -66,58 +74,81 @@ bool TCPSocket::readMessage(int fd)
         return false;
     recv(fd, (char*)&_typeMsg, sizeof(TypeMsg), MSG_DONTWAIT); // IGNORE BYTES
 
-    // set size buffer
-    uint16 bufferSize = AllBytesSize - sizeof(uint16) - sizeof(TypeMsg);
-    _buffer.resize(bufferSize);
+    auto callbackReadBody = [&] (Buffer &buff) -> bool {
+        // set size buffer
+        uint16 bufferSize = AllBytesSize - sizeof(uint16) - sizeof(TypeMsg);
+        buff.resize(bufferSize);
 
-    /* READ BODY MSG */
-    if (recv(fd, _buffer.data(), bufferSize, MSG_PEEK | MSG_DONTWAIT) != bufferSize)
+        if (recv(fd, buff.data(), bufferSize, MSG_PEEK | MSG_DONTWAIT) != bufferSize)
+            return false;
+
+        recv(fd, buff.data(), bufferSize, MSG_DONTWAIT); // IGNORE BYTES
+        _lastConfirmConnection = steady_clock::now();
+        return true;
+    };
+
+    // if specified msg
+    if (_typeMsg != TypeMsg::UserMsg) {
+        Buffer b;
+        callbackReadBody(b);
+        procSpecifiedMsg(b, fd);
         return false;
-    recv(fd, _buffer.data(), bufferSize, MSG_DONTWAIT); // IGNORE BYTES
+    }
 
-    return true;
+    return callbackReadBody(_buffer);
 }
 
 bool TCPSocket::readMessage()
 {
-    return readMessage(_fd);
+    return readMessage(*this);
+}
+
+void TCPSocket::stop() {
+    _running.store(false);
+    close(_fd);
+//    closeSocketFD();
 }
 
 CallbackRecv TCPSocket::getCallbackRead() const
 {
-    return callbackRead;
+    return _callbackRead;
 }
 
 void TCPSocket::setCallbackRead(const CallbackRecv &value)
 {
-    callbackRead = value;
+    _callbackRead = value;
 }
 
 //////////////////////////
 ///  SocketFD Implement.
 ///  S. J.
 
-void SocketFD::sendMessage(const std::string &msg) const
+void SocketFD::sendTestConnection() const
 {
-    sendData(Buffer(msg), TypeMsg::UserMsg);
+    sendMessage("", TypeMsg::TestConnection);
 }
 
-void SocketFD::sendData(const Buffer &buffer) const
+uint16 SocketFD::sendMessage(const std::string &msg) const
 {
-    sendData(buffer, TypeMsg::UserMsg);
+    return sendData(Buffer(msg), TypeMsg::UserMsg);
 }
 
-void SocketFD::sendData(const Buffer &buffer, TypeMsg type) const
+uint16 SocketFD::sendData(const Buffer &buffer) const
+{
+    return sendData(buffer, TypeMsg::UserMsg);
+}
+
+uint16 SocketFD::sendData(const Buffer &buffer, TypeMsg type) const
 {
     uint16 sz = buffer.size() + sizeof(uint16) + sizeof(type);
     Buffer forSend;
     forSend << sz;
     forSend << type;
     forSend << buffer;
-    send(_fd, forSend.data(), forSend.size(), MSG_NOSIGNAL);
+    return send(_fd, forSend.data(), forSend.size(), MSG_NOSIGNAL);
 }
 
-void SocketFD::sendMessage(const std::string &msg, TypeMsg type) const
+uint16 SocketFD::sendMessage(const std::string &msg, TypeMsg type) const
 {
-    sendData(msg, type);
+    return sendData(msg, type);
 }

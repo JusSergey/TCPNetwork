@@ -6,6 +6,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <unistd.h>
 #include <err.h>
 #include <cstring>
 
@@ -15,24 +16,28 @@
 #include <vector>
 #include <type_traits>
 
-
 namespace Net {
 
+using namespace std::chrono;
+
+class TCPServer;
 struct SocketFD;
 class Buffer;
 
-using __Buffer           = std::vector<char>;
-using CallbackRecv       = std::function<void(Buffer, SocketFD)>;
-using CallbackLoop       = std::function<void()>;
+using __Buffer     = std::vector<char>;
+using CallbackRecv = std::function<void(Buffer, SocketFD)>;
+using CallbackLoop = std::function<void()>;
+
 using uint64 = uint64_t;
 using uint32 = uint32_t;
 using uint16 = uint16_t;
+
 using int64 = int64_t;
 using int32 = int32_t;
 using int16 = int16_t;
 
 enum class TypeMsg : char {
-    UserMsg, TestConnection, Disconnect
+    UserMsg, TestConnection, Disconnect, ConfirmConnection
 };
 
 enum class SocketStatus : int {
@@ -52,13 +57,11 @@ public:
         memcpy(this->data(), str.data(), strsz);
         data()[strsz] = '\0';
     }
-
     Buffer &operator = (const std::string &str) {
         this->resize(str.size());
         memcpy(this->data(), str.data(), str.size());
         return *this;
     }
-
     Buffer(size_t sz) : __Buffer(sz) {}
     Buffer() = default;
 
@@ -132,6 +135,9 @@ public:
 };
 
 struct SocketFD {
+    friend class TCPServer;
+    friend class TCPClient;
+
     int _fd;
     operator int&() {
         return _fd;
@@ -155,12 +161,21 @@ struct SocketFD {
     { return _fd != static_cast<std::underlying_type<SocketStatus>::type>(_cmp); }
 
     inline bool isValid() const { return *this != SocketStatus::Failed; }
+    inline void setValidFalse() { _fd = static_cast<std::underlying_type<SocketStatus>::type>(SocketStatus::Failed); }
+    inline void closeSocketFD() { close(_fd); setValidFalse(); }
 
-    void sendMessage(const std::string &msg) const;
-    void sendData(const Buffer &buffer) const;
+    void sendTestConnection() const;
+
+    ///
+    /// \brief send functions
+    /// \param msg/buffer
+    /// \return sendlen
+    ///
+    uint16 sendMessage(const std::string &msg) const;
+    uint16 sendData(const Buffer &buffer) const;
 protected:
-    void sendData(const Buffer &buffer, TypeMsg type) const;
-    void sendMessage(const std::string &msg, TypeMsg type) const;
+    uint16 sendData(const Buffer &buffer, TypeMsg type) const;
+    uint16 sendMessage(const std::string &msg, TypeMsg type) const;
 };
 
 class TCPSocket : public SocketFD
@@ -172,22 +187,26 @@ public:
 
 protected:
     void initLoop(CallbackLoop callbackLoop);
-    bool readMessage(int fd);
+    bool readMessage(SocketFD &fd);
     bool readMessage();
 
 public:
-    inline void stop() { _running.store(false); }
+    void stop();
     CallbackRecv getCallbackRead() const;
     void setCallbackRead(const CallbackRecv &value);
+    inline int64 getTimeConfirmConnectionMSEC() const {
+        return (duration_cast<milliseconds>(steady_clock::now() - _lastConfirmConnection)).count();
+    }
 
 protected: /* data info to init */
     std::string _ip;
     u_short _port;
 
 protected: /* data read/write buffers */
-    CallbackRecv callbackRead = [] (Buffer, SocketFD) {};
+    CallbackRecv _callbackRead = [] (Buffer, SocketFD) {};
     Buffer _buffer;
     TypeMsg _typeMsg;
+    time_point<steady_clock> _lastConfirmConnection;
 
 protected: /* data to init socket */
     std::atomic_bool _running;
@@ -195,6 +214,14 @@ protected: /* data to init socket */
 
 protected:
     void unlockfd();
+
+protected:
+    virtual void specifiedDisconnect(Buffer &buff, SocketFD &socket) = 0;
+    virtual void specifiedTectConnection(Buffer &buff, SocketFD &socket) = 0;
+    virtual void specifiedConfirmConnection(Buffer &buff, SocketFD &socket) = 0;
+
+private:
+    void procSpecifiedMsg(Buffer &buff, SocketFD &socket);
 };
 
 }

@@ -11,7 +11,12 @@ class TCPClient : public TCPSocket
 public:
     TCPClient(const std::string &ip, u_short port);
     CallbackLoop getCallbackLoopClient();
-    void disconnect();
+    void disconnectFromHost();
+
+protected:
+    virtual void specifiedDisconnect(Buffer &buff, SocketFD &socket) override;
+    virtual void specifiedTectConnection(Buffer &buff, SocketFD &socket) override;
+    virtual void specifiedConfirmConnection(Buffer &buff, SocketFD &socket) override;
 };
 
 }
