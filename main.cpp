@@ -1,7 +1,10 @@
-#include <QCoreApplication>
+//#include <QCoreApplication>
 #include "net.h"
-#include <QFile>
+//#include <QFile>
 #include <chrono>
+
+#include "filesender.h"
+#include "filereceiver.h"
 
 using namespace Net;
 
@@ -25,30 +28,54 @@ callbackServerRead(TCPServer &server) {
     };
 }
 
+void testeDevice() {
+    Buffer buff;
+    buff << std::string("12345678...");
+    Device dev(&buff);
+    char *line = new char[buff.size()+1];
+    dev.read(line, 4);
+    line[4] = '\0';
+    (std::cout << "line: " << line).flush();
+
+    dev.read(line, 4);
+    line[4] = '\0';
+    (std::cout << "line: " << line).flush();
+}
+
 int main(int argc, char *argv[])
 {
-    QCoreApplication a(argc, argv);
-
     constexpr const char *IP = "127.0.0.1";
-    constexpr u_short PORT = 2121;
+    constexpr u_short PORT = 2122;
 
     {
-        TCPServer server(IP, PORT);
-        TCPClient client(IP, PORT);
+        FileReceiver recver(IP, PORT);
+        FileSender sender(IP, PORT);
+        Buffer buffForSend;
 
-        server.setCallbackRead(callbackServerRead(server));
-        client.setCallbackRead(callbackClientRead());
+        std::this_thread::sleep_for(seconds(1));
+        sender.asyncSendFile("copy.txt", "1.jpg", [](const std::string &filename){
+            std::cout << "sending [" << filename << "] complete...\n";
+        });
+//        sender.asyncSendFile("TextFile.txt", &buffForSend);
 
-        server.setUserCallbackDisconnect([](SocketFD fd){ std::cout << "server: disconnect fd: " << fd << '\n'; });
+//        TCPServer server(IP, PORT);
+//        TCPClient client(IP, PORT);
 
-        client.sendMessage("Hello...");
+//        server.setCallbackRead(callbackServerRead(server));
+//        client.setCallbackRead(callbackClientRead());
 
-        std::this_thread::sleep_for(seconds(2));
-        client.disconnectFromHost();
+//        server.setUserCallbackDisconnect([](SocketFD fd){ std::cout << "server: disconnect fd: " << fd << '\n'; });
+
+//        client.sendMessage("Hello...");
+
+//        std::this_thread::sleep_for(seconds(8));
+//        client.disconnectFromHost();
 
         std::cin.get();
-        return 0;
+//        return 0;
+
     }
 
-    return a.exec();
+    return 0;
+//    return a.exec();
 }

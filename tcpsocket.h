@@ -21,8 +21,8 @@ namespace Net {
 using namespace std::chrono;
 
 class TCPServer;
-struct SocketFD;
 class Buffer;
+struct SocketFD;
 
 using __Buffer     = std::vector<char>;
 using CallbackRead = std::function<void(Buffer, SocketFD)>;
@@ -44,7 +44,7 @@ enum class SocketStatus : int {
     Failed = -1
 };
 
-constexpr auto MAX_SIZE_PACKET = 65536 - sizeof(uint16) - sizeof(TypeMsg);
+constexpr auto MAX_SIZE_PACKET = 65535 - sizeof(uint16) - sizeof(TypeMsg);
 constexpr auto DELAY_TIME = 1; //ms
 
 class Buffer : public __Buffer {
@@ -89,9 +89,16 @@ public:
             push_back(dt[i]);
         return *this;
     }
-    Buffer &operator << (TypeMsg type) {
-        push_back(static_cast<std::underlying_type<TypeMsg>::type>(type));
-        return *this;
+
+    void append(void *_src, size_t len) {
+        reserve(size() + len + 4);
+        for (size_t i = 0; i < len; ++i)
+            push_back(static_cast<const char*>(_src)[i]);
+    }
+
+    template <typename EnumT, typename = typename std::enable_if<std::is_enum<EnumT>::value>::type>
+    Buffer &operator << (EnumT type) {
+        return this->operator << (static_cast<typename std::underlying_type<EnumT>::type>(type));
     }
 
     std::string toString() const {
@@ -119,15 +126,17 @@ public:
     Device(const Device &dev) = default;
     Device &operator = (const Device &) = default;
 
-    size_t read(char *destination, uint64 len) {
+    size_t read(void *destination, uint64 len) {
         auto sub = _sz-_pos;
         size_t readlen = sub < len ? sub : len;
         memcpy(destination, _device->data() + _pos, readlen);
         _pos += readlen;
         return readlen;
     }
-    size_t getPos() { return _pos; }
-    Buffer *getDevice() { return _device; }
+    inline size_t getPos() const { return _pos; }
+    inline size_t getAvailableSize() const { return _device->size() - _pos; }
+    inline Buffer *getDevice() const { return _device; }
+    inline void *getCurrentPointerOnData() const { return _device->data() + _pos; }
 
     void setBuffer(Buffer *device) {
         _device = device;
@@ -135,13 +144,11 @@ public:
         _sz = _device->size();
     }
 
-    void setPos(size_t pos) {
-        _pos = pos;
-    }
+    inline void setPos(size_t pos) { _pos = pos; }
 
-    void reset() {
-        _pos = 0;
-    }
+    inline void addPos(size_t offset) { _pos += offset; }
+
+    inline void reset() { _pos = 0; }
 };
 
 struct SocketFD {
@@ -209,7 +216,7 @@ public:
         return (duration_cast<milliseconds>(steady_clock::now() - _lastConfirmConnection)).count();
     }
     template <typename Enum, typename EnumType = typename std::underlying_type<Enum>::type>
-    constexpr inline EnumType toUnderlying(Enum value) {
+    constexpr inline EnumType toUnderlying(Enum value) const {
         return static_cast<typename std::underlying_type<Enum>::type>(value);
     }
 
