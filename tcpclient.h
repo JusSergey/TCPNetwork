@@ -10,6 +10,7 @@ class TCPClient : public TCPSocket
 {
 public:
     TCPClient(const std::string &ip, u_short port);
+    virtual ~TCPClient();
     CallbackLoop getCallbackLoopClient();
     void disconnectFromHost();
 

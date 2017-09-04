@@ -26,8 +26,7 @@ TCPSocket::TCPSocket(const std::string &ip, uint16 port) :
 
 TCPSocket::~TCPSocket()
 {
-    if (_running.load())
-        stop();
+    stop();
 }
 
 void TCPSocket::initLoop(CallbackLoop callbackLoop)
@@ -57,7 +56,7 @@ void TCPSocket::procSpecifiedMsg(Buffer &buff, SocketFD &socket)
     case TypeMsg::ConfirmConnection: specifiedConfirmConnection(buff, socket); break;
     case TypeMsg::Disconnect: specifiedDisconnect(buff, socket); break;
     case TypeMsg::TestConnection: specifiedTectConnection(buff, socket); break;
-    default: (std::cout << "TCPSocket::procSpecifiedMsg():temrinate").flush(); std::terminate();
+    default: (std::cout << "TCPSocket::procSpecifiedMsg():terminate").flush(); std::terminate();
     }
 }
 
@@ -104,17 +103,18 @@ bool TCPSocket::readMessage()
 }
 
 void TCPSocket::stop() {
-    _running.store(false);
-    close(_fd);
-//    closeSocketFD();
+    if (_running.load()){
+        _running.store(false);
+        closeSocketFD();
+    }
 }
 
-CallbackRecv TCPSocket::getCallbackRead() const
+CallbackRead TCPSocket::getCallbackRead() const
 {
     return _callbackRead;
 }
 
-void TCPSocket::setCallbackRead(const CallbackRecv &value)
+void TCPSocket::setCallbackRead(const CallbackRead &value)
 {
     _callbackRead = value;
 }

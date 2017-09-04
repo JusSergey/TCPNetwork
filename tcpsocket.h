@@ -25,7 +25,7 @@ struct SocketFD;
 class Buffer;
 
 using __Buffer     = std::vector<char>;
-using CallbackRecv = std::function<void(Buffer, SocketFD)>;
+using CallbackRead = std::function<void(Buffer, SocketFD)>;
 using CallbackLoop = std::function<void()>;
 
 using uint64 = uint64_t;
@@ -71,6 +71,16 @@ public:
             push_back(reinterpret_cast<const char *>(&obj)[i]);
         return *this;
     }
+
+    Buffer &operator << (const std::string &str) {
+        const size_t sz = str.size();
+        const char *dt = str.data();
+        reserve(size() + sz + 4);
+        for(int i = 0; i < sz; ++i)
+            push_back(dt[i]);
+        return *this;
+    }
+
     Buffer &operator << (const Buffer &buffer) {
         const size_t sz = buffer.size();
         const char *dt = buffer.data();
@@ -84,7 +94,7 @@ public:
         return *this;
     }
 
-    std::string toString() {
+    std::string toString() const {
 
         std::string str;
         const size_t len = size();
@@ -144,16 +154,17 @@ struct SocketFD {
     }
     SocketFD &operator = (const SocketStatus &status) {
         _fd = static_cast<std::underlying_type<SocketStatus>::type>(status);
+        return *this;
     }
 
     inline int toInt() const { return _fd; }
 
     SocketFD(const SocketFD &) = default;
-    SocketFD() = default;
-    SocketFD(int fd) : _fd(fd) {}
+    SocketFD(int fd = -1) : _fd(fd) {}
 
     inline bool operator == (const SocketFD &_cmp) const { return _fd == _cmp._fd; }
     inline bool operator != (const SocketFD &_cmp) const { return _fd != _cmp._fd; }
+    inline bool operator <  (const SocketFD &_cmp) const { return _fd <  _cmp._fd; }
 
     inline bool operator == (const SocketStatus &_cmp) const
     { return _fd == static_cast<std::underlying_type<SocketStatus>::type>(_cmp); }
@@ -192,10 +203,14 @@ protected:
 
 public:
     void stop();
-    CallbackRecv getCallbackRead() const;
-    void setCallbackRead(const CallbackRecv &value);
+    CallbackRead getCallbackRead() const;
+    void setCallbackRead(const CallbackRead &value);
     inline int64 getTimeConfirmConnectionMSEC() const {
         return (duration_cast<milliseconds>(steady_clock::now() - _lastConfirmConnection)).count();
+    }
+    template <typename Enum, typename EnumType = typename std::underlying_type<Enum>::type>
+    constexpr inline EnumType toUnderlying(Enum value) {
+        return static_cast<typename std::underlying_type<Enum>::type>(value);
     }
 
 protected: /* data info to init */
@@ -203,7 +218,7 @@ protected: /* data info to init */
     u_short _port;
 
 protected: /* data read/write buffers */
-    CallbackRecv _callbackRead = [] (Buffer, SocketFD) {};
+    CallbackRead _callbackRead = [] (Buffer, SocketFD) {};
     Buffer _buffer;
     TypeMsg _typeMsg;
     time_point<steady_clock> _lastConfirmConnection;

@@ -4,10 +4,10 @@ using namespace Net;
 TCPServer::TCPServer(const std::string &ip, u_short port) :
     TCPSocket(ip, port)
 {
-    if(bind(_fd, (struct sockaddr *)&_sock, sizeof(_sock)) < 0)
+    if(_serverFD = bind(_fd, (struct sockaddr *)&_sock, sizeof(_sock)) < 0)
         err(0, "bind(): failed.");
 
-    listen(_fd, 16);
+    listen(_fd, 8);
 
     unlockfd();
 
@@ -16,26 +16,30 @@ TCPServer::TCPServer(const std::string &ip, u_short port) :
 
 TCPServer::~TCPServer()
 {
-
+    for (SocketFD &socket : _clientsFD)
+        disconnectClientFromServer(socket);
+    close(_serverFD);
 }
 
 void TCPServer::acceptClient()
 {
     int fd = accept(_fd, NULL, NULL);
+
     if (fd >= 0) {
-        clientsFD.push_back(fd);
-        callbackConnected(fd);
+        _clientsFD.push_back(fd);
+        postConnected(SocketFD(fd));
+        _userCallbackConnected(fd);
     }
     std::cout.flush();
 }
 
 void TCPServer::recvMsg()
 {
-    for (SocketFD &fd : clientsFD)
+    for (SocketFD &fd : _clientsFD)
         if (readMessage(fd))
             _callbackRead(_buffer, fd);
 
-    clientsFD.remove_if([] (const SocketFD &fd) -> bool { return !fd.isValid(); });
+    _clientsFD.remove_if([] (const SocketFD &fd) -> bool { return !fd.isValid(); });
 }
 
 CallbackLoop TCPServer::getCallbackLoopServer()
@@ -46,33 +50,39 @@ CallbackLoop TCPServer::getCallbackLoopServer()
     };
 }
 
-CallbackConnected TCPServer::getCallbackConnected() const
+CallbackConnected TCPServer::getUserCallbackConnected() const
 {
-    return callbackConnected;
+    return _userCallbackConnected;
 }
 
-void TCPServer::setCallbackConnected(const CallbackConnected &value)
+void TCPServer::setUserCallbackConnected(const CallbackConnected &value)
 {
-    callbackConnected = value;
+    _userCallbackConnected = value;
 }
 
-CallbackDisconnect TCPServer::getCallbackDisconnect() const
+CallbackDisconnect TCPServer::getUserCallbackDisconnect() const
 {
-    return callbackDisconnect;
+    return _userCallbackDisconnect;
 }
 
-void TCPServer::setCallbackDisconnect(const CallbackDisconnect &value)
+void TCPServer::setUserCallbackDisconnect(const CallbackDisconnect &value)
 {
-    callbackDisconnect = value;
+    _userCallbackDisconnect = value;
 }
 
 void TCPServer::disconnectClientFromServer(SocketFD fdClient)
 {
     fdClient.sendMessage("DISCONNECT FROM HOST", TypeMsg::Disconnect);
 
-    for (SocketFD &fd : clientsFD)
-        if (fd == fdClient)
+    for (SocketFD &fd : _clientsFD)
+        if (fd == fdClient) {
+            std::cout.flush();
             fd.setValidFalse();
+            break;
+        }
+
+    prevDisconnected(fdClient);
+    _userCallbackDisconnect(fdClient);
 }
 
 void TCPServer::specifiedConfirmConnection(Buffer &buff, SocketFD &socket)
@@ -81,7 +91,9 @@ void TCPServer::specifiedConfirmConnection(Buffer &buff, SocketFD &socket)
 
 void TCPServer::specifiedDisconnect(Buffer &buff, SocketFD &socket)
 {
+    prevDisconnected(socket);
     socket.closeSocketFD();
+    _userCallbackDisconnect(socket);
 }
 
 void TCPServer::specifiedTectConnection(Buffer &buff, SocketFD &socket)

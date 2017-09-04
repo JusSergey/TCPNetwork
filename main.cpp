@@ -10,8 +10,8 @@ callbackClientRead() {
     return [] (Net::Buffer buffer, Net::SocketFD socket) {
         std::cout << "client: " << buffer.toString() << '\n';
         std::cout.flush();
-        socket.sendMessage((buffer).toString());
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        socket.sendMessage(buffer.toString());
+        std::this_thread::sleep_for(milliseconds(500));
     };
 }
 
@@ -30,7 +30,7 @@ int main(int argc, char *argv[])
     QCoreApplication a(argc, argv);
 
     constexpr const char *IP = "127.0.0.1";
-    constexpr u_short PORT = 2114;
+    constexpr u_short PORT = 2121;
 
     {
         TCPServer server(IP, PORT);
@@ -39,7 +39,7 @@ int main(int argc, char *argv[])
         server.setCallbackRead(callbackServerRead(server));
         client.setCallbackRead(callbackClientRead());
 
-        server.setCallbackDisconnect([](SocketFD fd){ std::cout << "server: disconnect fd: " << fd << '\n'; });
+        server.setUserCallbackDisconnect([](SocketFD fd){ std::cout << "server: disconnect fd: " << fd << '\n'; });
 
         client.sendMessage("Hello...");
 

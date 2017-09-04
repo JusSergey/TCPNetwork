@@ -14,7 +14,6 @@ using CallbackDisconnect= std::function<void(SocketFD)>;
 class TCPServer : public TCPSocket
 {
 public:
-    friend struct SocketFD;
     using ListClients = std::list<SocketFD>;
 
 public:
@@ -27,26 +26,29 @@ private:
     CallbackLoop getCallbackLoopServer();
 
 public:
-    inline const ListClients &getClients() { return clientsFD; }
+    inline const ListClients &getClients() const { return _clientsFD; }
 
-    CallbackConnected getCallbackConnected() const;
-    void setCallbackConnected(const CallbackConnected &value);
+    CallbackConnected getUserCallbackConnected() const;
+    void setUserCallbackConnected(const CallbackConnected &value);
 
-    CallbackDisconnect getCallbackDisconnect() const;
-    void setCallbackDisconnect(const CallbackDisconnect &value);
+    CallbackDisconnect getUserCallbackDisconnect() const;
+    void setUserCallbackDisconnect(const CallbackDisconnect &value);
 
     void disconnectClientFromServer(SocketFD fdClient);
 
-private:
-    ListClients clientsFD;
-    CallbackConnected callbackConnected = [] (SocketFD) {};
-    CallbackDisconnect callbackDisconnect = [] (SocketFD) {};
+protected:
+    int _serverFD;
+    ListClients _clientsFD;
+    CallbackConnected _userCallbackConnected = [] (SocketFD) {};
+    CallbackDisconnect _userCallbackDisconnect = [] (SocketFD) {};
 
 protected:
     virtual void specifiedDisconnect(Buffer &buff, SocketFD &socket) override;
     virtual void specifiedTectConnection(Buffer &buff, SocketFD &socket) override;
     virtual void specifiedConfirmConnection(Buffer &buff, SocketFD &socket) override;
 
+    virtual void postConnected(SocketFD) {}
+    virtual void prevDisconnected(SocketFD) {}
 };
 
 }

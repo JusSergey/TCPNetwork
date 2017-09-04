@@ -15,6 +15,12 @@ TCPClient::TCPClient(const std::string &ip, u_short port) :
     initLoop(getCallbackLoopClient());
 }
 
+TCPClient::~TCPClient()
+{
+    if (_running.load())
+        disconnectFromHost();
+}
+
 CallbackLoop TCPClient::getCallbackLoopClient()
 {
     return [this] {
@@ -27,7 +33,8 @@ CallbackLoop TCPClient::getCallbackLoopClient()
 void TCPClient::disconnectFromHost()
 {
     sendMessage("good bye...", TypeMsg::Disconnect);
-    stop();
+    specifiedDisconnect(_buffer, *this);
+    setValidFalse();
 }
 
 void TCPClient::specifiedConfirmConnection(Buffer &buff, SocketFD &socket)
