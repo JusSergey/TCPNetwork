@@ -14,7 +14,10 @@ SOURCES += main.cpp \
     tcpclient.cpp \
     tcpserver.cpp \
     filesender.cpp \
-    filereceiver.cpp
+    filereceiver.cpp \
+    buffer.cpp \
+    device.cpp \
+    socketfd.cpp
 
 # The following define makes your compiler emit warnings if you use
 # any feature of Qt which as been marked deprecated (the exact warnings
@@ -34,4 +37,9 @@ HEADERS += \
     net.h \
     filesender.h \
     filereceiver.h \
-    file.h
+    file.h \
+    buffer.h \
+    device.h \
+    typedefs.h \
+    socketfd.h \
+    callbacktypes.h

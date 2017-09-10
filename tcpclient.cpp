@@ -1,6 +1,8 @@
 #include "tcpclient.h"
+#include "tcpsocket.h"
+#include "socketfd.h"
 #include <stdlib.h>
-using namespace Net;
+//using namespace Net;
 
 TCPClient::TCPClient(const std::string &ip, u_short port) :
     TCPSocket(ip, port)

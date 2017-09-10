@@ -3,23 +3,28 @@
 #include "net.h"
 #include "file.h"
 
-class FileReceiver : public Net::TCPServer
+class FileReceiver : public TCPServer
 {
 private:
     CallbackFileSendComplete _callbackFileSendComplete = [](const std::string &){};
-    Net::Device *dev = nullptr;
+    CallbackAcceptRecvFile _callbackAcceptRecvFile = [](const std::string &) { return true; };
+    Device *dev = nullptr;
     std::string receiverFilename;
+
 public:
     FileReceiver(const std::string &ip, u_short port);
 
 public:
     void setCallbackFileSendComplete(const CallbackFileSendComplete &callbackFileSendComplete);
+    void setCallbackAcceptRecvFile(const CallbackAcceptRecvFile &callbackAcceptRecvFile);
 
 private:
-    Net::CallbackRead _makeCallbackRead();
-    void _makeFile(const std::string &filename);
-    void _readNextPackage(Net::Device &device);
-    void _getNextPackage(Net::SocketFD &socket);
+    CallbackRead _makeCallbackRead();
+    bool _caseCreateNewFile(Device &reader, SocketFD &socket); // return - is success
+    void _caseReadNextPackage(Device &device);
+    void _caseGetNextPackage(SocketFD &socket);
+    bool _makeFile(const std::string &filename);
+    void _rejectRecvFile(SocketFD &socket);
 };
 
 #endif // FILERECEIVER_H

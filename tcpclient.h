@@ -2,9 +2,9 @@
 #define TCPCLIENT_H
 
 #include <string>
+#include "socketfd.h"
 #include "tcpsocket.h"
-
-namespace Net {
+#include "typedefs.h"
 
 class TCPClient : public TCPSocket
 {
@@ -19,7 +19,5 @@ protected:
     virtual void specifiedTectConnection(Buffer &buff, SocketFD &socket) override;
     virtual void specifiedConfirmConnection(Buffer &buff, SocketFD &socket) override;
 };
-
-}
 
 #endif // TCPCLIENT_H
