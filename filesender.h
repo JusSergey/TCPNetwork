@@ -3,12 +3,15 @@
 #include "net.h"
 #include "file.h"
 
-class FileSender : public Net::TCPClient
+class FileSender : public TCPClient
 {
+#define DEF_CALLBACK_STR [](const std::string &){}
+
 private:
-    CallbackFileSendComplete _callbackFileSendComplete = [](const std::string &){};
-    Net::Device *readerSendFile = nullptr;
-    Net::Device *readerRecvData = nullptr;
+    CallbackFileSendComplete _callbackFileSendComplete = nullptr;
+    CallbackFileSendAbort _callFileSendAbort = nullptr;
+    Device *readerSendFile = nullptr;
+    Device *readerRecvData = nullptr;
     std::string senderFilename;
 
 public:
@@ -16,20 +19,22 @@ public:
 
 public:
     void asyncSendFile(const std::string &nameOnRemoteMachine,
-                       Net::Buffer *ptrToBuffer,
-                       const CallbackFileSendComplete &callback = [](const std::string &){});
+                       Buffer *ptrToBuffer,
+                       const CallbackFileSendComplete &callback = DEF_CALLBACK_STR,
+                       const CallbackFileSendAbort &callbackAbort = DEF_CALLBACK_STR);
 
     void asyncSendFile(const std::string &nameOnRemoteMachine,
                        const std::string &pathToFileInHost,
-                       const CallbackFileSendComplete &callback = [](const std::string &){});
+                       const CallbackFileSendComplete &callback = DEF_CALLBACK_STR);
 
 private:
-    Net::CallbackRead _makeCallbackRead();
+    CallbackRead _makeCallbackRead();
 
 private:
     void _sendFilenameOnRemoteMachine(const std::string &filename);
     void _sendNextPacket();
-    void _sendSignalComplete();
+    void _caseRejectRecv();
+    void _clearBuffer();
 };
 
 #endif // FILESENDER_H

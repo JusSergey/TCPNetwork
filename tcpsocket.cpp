@@ -3,7 +3,17 @@
 #include <fcntl.h>
 #include <thread>
 #include <unistd.h>
-using namespace Net;
+//using namespace Net;
+
+void TCPSocket::setName(const std::string &name)
+{
+    _name = name;
+}
+
+std::string TCPSocket::getName() const
+{
+    return _name;
+}
 
 TCPSocket::TCPSocket(const std::string &ip, uint16 port) :
     SocketFD(-1),
@@ -56,7 +66,8 @@ void TCPSocket::procSpecifiedMsg(Buffer &buff, SocketFD &socket)
     case TypeMsg::ConfirmConnection: specifiedConfirmConnection(buff, socket); break;
     case TypeMsg::Disconnect: specifiedDisconnect(buff, socket); break;
     case TypeMsg::TestConnection: specifiedTectConnection(buff, socket); break;
-    default: (std::cout << "TCPSocket::procSpecifiedMsg():terminate").flush(); std::terminate();
+    default: (std::cout << _name << ": TCPSocket::procSpecifiedMsg():terminate(code " << (int)_typeMsg << ")").flush();
+        std::terminate();
     }
 }
 
@@ -66,12 +77,12 @@ bool TCPSocket::readMessage(SocketFD &fd)
     uint16 AllBytesSize = 0;
     if (recv(fd, (char*)&AllBytesSize, sizeof(uint16), MSG_PEEK | MSG_DONTWAIT) < sizeof(uint16) || AllBytesSize < sizeof(uint16))
         return false;
-    recv(fd, (char*)&AllBytesSize, sizeof(uint16), MSG_DONTWAIT); // IGNORE BYTES
+    recv(fd, (char*)&AllBytesSize, sizeof(uint16), MSG_WAITALL); // IGNORE BYTES
 
     /* READ TYPE MSG */
     if (recv(fd, (char*)&_typeMsg, sizeof(TypeMsg), MSG_PEEK | MSG_DONTWAIT) < sizeof(TypeMsg))
         return false;
-    recv(fd, (char*)&_typeMsg, sizeof(TypeMsg), MSG_DONTWAIT); // IGNORE BYTES
+    recv(fd, (char*)&_typeMsg, sizeof(TypeMsg), MSG_WAITALL); // IGNORE BYTES
 
     auto callbackReadBody = [&] (Buffer &buff) -> bool {
         // set size buffer
@@ -81,8 +92,9 @@ bool TCPSocket::readMessage(SocketFD &fd)
         if (recv(fd, buff.data(), bufferSize, MSG_PEEK | MSG_DONTWAIT) != bufferSize)
             return false;
 
-        recv(fd, buff.data(), bufferSize, MSG_DONTWAIT); // IGNORE BYTES
+        recv(fd, buff.data(), bufferSize, MSG_WAITALL); // IGNORE BYTES
         _lastConfirmConnection = steady_clock::now();
+
         return true;
     };
 
@@ -128,27 +140,3 @@ void SocketFD::sendTestConnection() const
     sendMessage("", TypeMsg::TestConnection);
 }
 
-uint16 SocketFD::sendMessage(const std::string &msg) const
-{
-    return sendData(Buffer(msg), TypeMsg::UserMsg);
-}
-
-uint16 SocketFD::sendData(const Buffer &buffer) const
-{
-    return sendData(buffer, TypeMsg::UserMsg);
-}
-
-uint16 SocketFD::sendData(const Buffer &buffer, TypeMsg type) const
-{
-    uint16 sz = buffer.size() + sizeof(uint16) + sizeof(type);
-    Buffer forSend;
-    forSend << sz;
-    forSend << type;
-    forSend << buffer;
-    return send(_fd, forSend.data(), forSend.size(), MSG_NOSIGNAL);
-}
-
-uint16 SocketFD::sendMessage(const std::string &msg, TypeMsg type) const
-{
-    return sendData(msg, type);
-}

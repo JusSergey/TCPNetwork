@@ -5,11 +5,10 @@
 #include <string>
 #include <list>
 #include "tcpsocket.h"
+#include "socketfd.h"
+#include "callbacktypes.h"
 
-namespace Net {
-
-using CallbackConnected = std::function<void(SocketFD)>;
-using CallbackDisconnect= std::function<void(SocketFD)>;
+//namespace Net {
 
 class TCPServer : public TCPSocket
 {
@@ -51,6 +50,6 @@ protected:
     virtual void prevDisconnected(SocketFD) {}
 };
 
-}
+//}
 
 #endif // TCPSERVER_H
